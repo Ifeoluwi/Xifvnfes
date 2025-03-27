@@ -4,151 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Live Trading Bot</title>
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/ccxt@4.4.27/dist/ccxt.browser.min.js"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        
-        body {
-            min-height: 100vh;
-            background: linear-gradient(120deg, #000428, #004e92);
-            padding: 2rem;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 2rem;
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
-            border: 1px solid rgba(255, 255, 255, 0.18);
-        }
-
-        h1 {
-            color: #fff;
-            text-align: center;
-            font-size: 2.5rem;
-            margin-bottom: 2rem;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-        }
-
-        .market-info {
-            background: rgba(255, 255, 255, 0.95);
-            padding: 1.5rem;
-            border-radius: 15px;
-            margin-bottom: 2rem;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-        }
-
-        .market-info h2 {
-            color: #2d3436;
-            margin-bottom: 1rem;
-            font-size: 1.5rem;
-        }
-
-        .market-data {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-        }
-
-        .data-card {
-            background: #fff;
-            padding: 1rem;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-        }
-
-        .trade-table {
-            background: #fff;
-            border-radius: 15px;
-            overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th {
-            background: #2d3436;
-            color: #fff;
-            padding: 1rem;
-            text-align: left;
-            font-weight: 500;
-        }
-
-        td {
-            padding: 1rem;
-            border-bottom: 1px solid #eee;
-        }
-
-        tr:hover {
-            background: #f8f9fa;
-        }
-
-        .status-buy {
-            color: #fff;
-            background: #00b894;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-weight: 500;
-            display: inline-block;
-            box-shadow: 0 2px 5px rgba(0, 184, 148, 0.3);
-        }
-
-        .status-sell {
-            color: #fff;
-            background: #ff7675;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-weight: 500;
-            display: inline-block;
-            box-shadow: 0 2px 5px rgba(255, 118, 117, 0.3);
-        }
-
-        .profit-positive {
-            color: #00b894;
-            font-weight: bold;
-        }
-
-        .profit-negative {
-            color: #ff7675;
-            font-weight: bold;
-        }
-
-        .total-balance {
-            margin-top: 2rem;
-            text-align: right;
-            padding: 1rem;
-            background: #2d3436;
-            color: #fff;
-            border-radius: 0 0 15px 15px;
-            font-size: 1.2rem;
-            font-weight: 500;
-        }
-    </style>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/ccxt@4.4.27/dist/ccxt.browser.min.js"></script>
 </head>
 <body>
+    <div class="console-toggle" onclick="toggleConsole()">❌</div>
+    <div id="consoleOutput" class="console-output"></div>
+
     <div class="container">
         <h1>📈 Crypto Trading Bot</h1>
         
+        <div class="capital-input">
+            <h2>Capital Management</h2>
+            <input type="number" id="capitalInput" placeholder="Enter your capital (USDT)">
+            <button onclick="setCapital()">Set Capital</button>
+            <div id="capitalInfo"></div>
+        </div>
+
         <div class="market-info">
             <h2>Market Overview</h2>
             <div class="market-data">
-                <div class="data-card" id="priceInfo">
-                    ⏳ Fetching market data...
-                </div>
-                <div class="data-card" id="tradeAction">
-                    ⌛ Waiting for trade signals...
-                </div>
+                <div class="data-card" id="priceInfo">⏳ Fetching market data...</div>
+                <div class="data-card" id="tradeAction">⌛ Waiting for trade signals...</div>
             </div>
         </div>
 
@@ -167,114 +44,10 @@
                 </thead>
                 <tbody id="tradeLog"></tbody>
             </table>
-            <div class="total-balance" id="totalBalance">
-                Total Balance: 0.00 USDT
-            </div>
+            <div class="total-balance" id="totalBalance">Total Balance: 0.00 USDT</div>
         </div>
     </div>
 
-    <script>
-        (async () => {
-            const exchange = new ccxt.bybit();
-            const symbol = 'BTC/USDT';
-            
-            let spreadEMA = null;
-            let previousVolatility = 0;
-            let hasPosition = false;
-            let buyPrice = 0;
-            let totalBalance = 0;
-
-            function formatDate(date) {
-                return date.toLocaleString('en-US', {
-                    month: 'short',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit'
-                });
-            }
-
-            function logTrade(buyPrice, sellPrice, buyStatus, sellStatus, profit) {
-                const logContainer = document.getElementById("tradeLog");
-                const time = new Date();
-                const row = document.createElement("tr");
-                
-                const profitClass = profit >= 0 ? 'profit-positive' : 'profit-negative';
-                totalBalance += profit;
-                
-                row.innerHTML = `
-                    <td>${formatDate(time)}</td>
-                    <td>${buyPrice.toFixed(2)} USDT</td>
-                    <td>${sellPrice ? sellPrice.toFixed(2) : '-'} USDT</td>
-                    <td><span class="status-buy">${buyStatus}</span></td>
-                    <td>${sellStatus ? `<span class="status-sell">${sellStatus}</span>` : '-'}</td>
-                    <td class="${profitClass}">${profit.toFixed(2)} USDT</td>
-                    <td class="${profitClass}">${totalBalance.toFixed(2)} USDT</td>
-                `;
-                
-                if (logContainer.firstChild) {
-                    logContainer.insertBefore(row, logContainer.firstChild);
-                } else {
-                    logContainer.appendChild(row);
-                }
-
-                document.getElementById('totalBalance').innerHTML = 
-                    `Total Balance: <span class="${totalBalance >= 0 ? 'profit-positive' : 'profit-negative'}">
-                        ${totalBalance.toFixed(2)} USDT
-                    </span>`;
-            }
-
-            async function fetchDynamicSpread() {
-                try {
-                    const trades = await exchange.fetchTrades(symbol, undefined, 10);
-                    let spreads = trades.map(t => t.price - (t.cost / t.amount));
-                    let avgSpread = spreads.reduce((a, b) => a + b, 0) / spreads.length;
-                    let volatility = Math.abs(avgSpread - previousVolatility) / (previousVolatility || 1);
-                    previousVolatility = avgSpread;
-                    return { spread: avgSpread, volatility };
-                } catch (error) {
-                    console.error("Error calculating spread:", error);
-                    return { spread: spreadEMA || 10, volatility: 1 };
-                }
-            }
-
-            async function placeOrders() {
-                try {
-                    const ticker = await exchange.fetchTicker(symbol);
-                    const midPrice = (ticker.bid + ticker.ask) / 2;
-                    const { spread: dynamicSpread, volatility } = await fetchDynamicSpread();
-                    const sellPrice = buyPrice + dynamicSpread;
-
-                    document.getElementById('priceInfo').innerHTML = `
-                        <strong>Price:</strong> ${midPrice.toFixed(2)} USDT<br>
-                        <strong>Spread:</strong> ${dynamicSpread.toFixed(2)}<br>
-                        <strong>Volatility:</strong> ${volatility.toFixed(2)}
-                    `;
-
-                    if (!hasPosition && ticker.last <= midPrice - dynamicSpread) {
-                        buyPrice = midPrice - dynamicSpread;
-                        console.log(`dynamic spread is ${dynamicSpread} `);
-                          document.getElementById('tradeAction').innerHTML = 
-                            `✅ Buy Signal @ ${buyPrice.toFixed(2)} USDT`;
-                        logTrade(buyPrice, null, 'EXECUTED', null, 0);
-                        hasPosition = true;
-                    }
-
-                    if (hasPosition && (sellPrice > buyPrice)) {
-                        const profit = sellPrice - buyPrice;
-                        document.getElementById('tradeAction').innerHTML = 
-                            `✅ Sell Signal @ ${sellPrice.toFixed(2)} USDT`;
-                        logTrade(buyPrice, sellPrice, 'EXECUTED', 'EXECUTED', profit);
-                        hasPosition = false;
-                    }
-
-                } catch (error) {
-                    console.error("Error placing orders:", error);
-                }
-            }
-
-            setInterval(placeOrders, 5000);
-        })();
-    </script>
+    <script src="bot.js"></script>
 </body>
 </html>
