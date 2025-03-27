@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Trading Bot</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/ccxt@4.4.27/dist/ccxt.browser.min.js"></script>
+</head>
+<body>
+    <div class="console-toggle" onclick="toggleConsole()">❌</div>
+    <div id="consoleOutput" class="console-output"></div>
+
+    <div class="container">
+        <h1>📈 Crypto Trading Bot</h1>
+        
+        <div class="capital-input">
+            <h2>Capital Management</h2>
+            <input type="number" id="capitalInput" placeholder="Enter your capital (USDT)">
+            <button onclick="setCapital()">Set Capital</button>
+            <div id="capitalInfo"></div>
+        </div>
+
+        <div class="market-info">
+            <h2>Market Overview</h2>
+            <div class="market-data">
+                <div class="data-card" id="priceInfo">⏳ Fetching market data...</div>
+                <div class="data-card" id="tradeAction">⌛ Waiting for trade signals...</div>
+            </div>
+        </div>
+
+        <div class="trade-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Buy Price</th>
+                        <th>Sell Price</th>
+                        <th>Buy Status</th>
+                        <th>Sell Status</th>
+                        <th>Profit</th>
+                        <th>Total Balance</th>
+                    </tr>
+                </thead>
+                <tbody id="tradeLog"></tbody>
+            </table>
+            <div class="total-balance" id="totalBalance">Total Balance: 0.00 USDT</div>
+        </div>
+    </div>
+
+    <script src="bot.js"></script>
+</body>
+</html>
