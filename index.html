@@ -55,9 +55,9 @@ const symbol = "BTC/USDT";
 let inPosition = false;
 let buyPrice = 0;
 let sellPrice = 0;
-let userCapital = 1000;
-let totalBalance = 1000;
-const feeRate = 0.0005; // reduced fees
+let userCapital = 10;
+let totalBalance = 10;
+const feeRate = 0.001; // reduced fees
 
 document.getElementById("totalBalance").innerText = totalBalance.toFixed(2);
 
@@ -90,7 +90,11 @@ let lastTrade = {
   sellStatus: "Pending", pm 
   profit: 0
 };
-
+        
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+        }
+        
 async function placeOrders() {
   try {
     const ticker = await exchange.fetchTicker(symbol);
@@ -152,6 +156,7 @@ async function placeOrders() {
       inPosition = false;
       buyPrice = 0;
       sellPrice = 0;
+        await sleep(1000);
     }
   } catch (err) {
     logToConsole(`Error: ${err.message}`);
