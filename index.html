@@ -18,7 +18,7 @@
             <h2>Capital Management</h2>
             <input type="number" id="capitalInput" placeholder="Enter your capital (USDT)">
             <button onclick="setCapital()">Set Capital</button>
-            <div id="capitalInfo"></div>
+            <div id="capitalInfo">Current Capital: Not Set</div>
         </div>
 
         <div class="market-info">
@@ -39,179 +39,170 @@
                         <th>Buy Status</th>
                         <th>Sell Status</th>
                         <th>Profit</th>
-                        <th>Total Balance</th>
                     </tr>
                 </thead>
                 <tbody id="tradeLog"></tbody>
             </table>
-            <div class="total-balance" id="totalBalance">Total Balance: 0.00 USDT</div>
+            <div class="total-balance" id="totalBalance">Total Balance: Not Set</div>
         </div>
     </div>
 
     <script>
-    const exchange = new ccxt.bybit();
-    const symbol = "BTC/USDT";
+        const exchange = new ccxt.bybit();
+        const symbol = "BTC/USDT";
 
-    let inPosition = false;
-    let buyPrice = 0;
-    let sellPrice = 0;
-    let userCapital = 1000;
-    let totalBalance = 1000;
-    const feeRate = 0.0005; // reduced fees
-    let consoleVisible = true;
+        let inPosition = false;
+        let buyPrice = 0;
+        let sellPrice = 0;
+        let userCapital = document.getElementById("capitalInput").value;
+        let totalBalance = null;
+        const feeRate = 0.0005;
+        let tradeLog = {};
+        let tradeHistory = [];
 
-    document.getElementById("totalBalance").innerText = `Total Balance: ${totalBalance.toFixed(2)} USDT`;
-
-    function toggleConsole() {
-        const consoleOutput = document.getElementById('consoleOutput');
-        const toggleButton = document.querySelector('.console-toggle');
-        consoleVisible = !consoleVisible;
-        
-        if (consoleVisible) {
-            consoleOutput.style.display = 'block';
-            toggleButton.textContent = '❌';
-            logToConsole('Console displayed');
-        } else {
-            consoleOutput.style.display = 'none';
-            toggleButton.textContent = '📋';
-            console.log('Console hidden');
-        }
-    }
-
-    function setCapital() {
-        const capitalInput = document.getElementById('capitalInput');
-        const capitalInfo = document.getElementById('capitalInfo');
-        const newCapital = parseFloat(capitalInput.value);
-
-        if (isNaN(newCapital) || newCapital <= 0) {
-            capitalInfo.innerHTML = '❌ Please enter a valid positive number';
-            logToConsole('Invalid capital input attempted');
-            return;
+        function logToConsole(msg) {
+            const logElement = document.createElement("div");
+            logElement.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            document.getElementById("consoleOutput").prepend(logElement);
+            console.log(msg);
         }
 
-        userCapital = newCapital;
-        totalBalance = newCapital;
-        updateTotalBalance();
-        
-        capitalInfo.innerHTML = `✅ Capital set to ${newCapital.toFixed(2)} USDT`;
-        logToConsole(`Capital updated to ${newCapital.toFixed(2)} USDT`);
-        
-        // Reset trade parameters
-        inPosition = false;
-        buyPrice = 0;
-        sellPrice = 0;
-    }
-
-    function logToConsole(msg) {
-        const consoleOutput = document.getElementById('consoleOutput');
-        const logEntry = document.createElement('div');
-        logEntry.className = 'log-entry';
-        logEntry.innerHTML = `[${new Date().toLocaleTimeString()}] ${msg}`;
-        consoleOutput.insertBefore(logEntry, consoleOutput.firstChild);
-        
-        // Keep only the last 100 messages
-        while (consoleOutput.children.length > 100) {
-            consoleOutput.removeChild(consoleOutput.lastChild);
-        }
-        
-        console.log(`[${new Date().toLocaleTimeString()}] ${msg}`);
-    }
-
-    function updateTotalBalance() {
-        document.getElementById("totalBalance").innerText = `Total Balance: ${totalBalance.toFixed(2)} USDT`;
-    }
-
-    function logTrade(buy, sell, buyStatus, sellStatus, profit) {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${new Date().toLocaleTimeString()}</td>
-            <td>${buy.toFixed(2)}</td>
-            <td>${sell.toFixed(2)}</td>
-            <td><span class="status-buy">${buyStatus}</span></td>
-            <td><span class="status-sell">${sellStatus}</span></td>
-            <td class="${profit >= 0 ? 'profit-positive' : 'profit-negative'}">${profit.toFixed(2)}</td>
-            <td>${totalBalance.toFixed(2)} USDT</td>
-        `;
-        document.getElementById('tradeLog').prepend(row);
-    }
-
-    let lastTrade = {
-        buyPrice: 0,
-        sellPrice: 0,
-        buyStatus: "Pending",
-        sellStatus: "Pending",
-        profit: 0
-    };
-
-    async function placeOrders() {
-        try {
-            const ticker = await exchange.fetchTicker(symbol);
-            const midPrice = (ticker.bid + ticker.ask) / 2;
-
-            document.getElementById('priceInfo').innerHTML = `
-                <strong>Current Price:</strong> ${midPrice.toFixed(2)} USDT
-            `;
-
-            if (!inPosition && buyPrice === 0 && sellPrice === 0) {
-                const spread = ticker.ask - ticker.bid;
-                buyPrice = midPrice - spread * 2; // Buy lower
-                sellPrice = midPrice + spread * 3; // Increased profit target
-                lastTrade = {
-                    buyPrice,
-                    sellPrice,
-                    buyStatus: "Pending",
-                    sellStatus: "Pending",
-                    profit: 0
-                };
-                logToConsole(`Waiting to Buy at ${buyPrice.toFixed(2)}`);
-                document.getElementById('tradeAction').innerText = `Waiting to Buy at ${buyPrice.toFixed(2)}`;
+        function setCapital() {
+            const capitalInput = document.getElementById("capitalInput").value;
+            if (capitalInput && capitalInput > 0) {
+                userCapital = parseFloat(capitalInput);
+                totalBalance = userCapital;
+                document.getElementById("capitalInfo").innerText = `Current Capital: ${userCapital} USDT`;
+                document.getElementById("totalBalance").innerText = `Total Balance: ${totalBalance.toFixed(2)} USDT`;
+                logToConsole(`Capital set to ${userCapital} USDT`);
+            } else {
+                logToConsole("Invalid capital amount");
             }
-
-            if (!inPosition && midPrice <= buyPrice) {
-                const tradeSize = userCapital * 0.2; // 20% of capital
-                const buyFee = tradeSize * feeRate;
-                inPosition = true;
-                lastTrade.buyStatus = "Executed";
-                logToConsole(`Bought at ${buyPrice.toFixed(2)}, Waiting to Sell at ${sellPrice.toFixed(2)}`);
-                document.getElementById('tradeAction').innerText = `Bought at ${buyPrice.toFixed(2)}, Waiting to Sell at ${sellPrice.toFixed(2)}`;
-            }
-
-            if (inPosition && midPrice >= sellPrice) {
-                const tradeSize = userCapital * 0.2;
-                const profitPercentage = ((sellPrice - buyPrice) / buyPrice) * 100;
-                const profitAmount = (tradeSize * profitPercentage) / 100;
-                const sellFee = (tradeSize + profitAmount) * feeRate;
-                const totalProfit = profitAmount - sellFee - (tradeSize * feeRate);
-
-                totalBalance += totalProfit;
-                userCapital = totalBalance; // Update user capital with new balance
-                updateTotalBalance();
-
-                lastTrade.sellStatus = "Executed";
-                lastTrade.profit = totalProfit;
-
-                logTrade(
-                    lastTrade.buyPrice,
-                    lastTrade.sellPrice,
-                    lastTrade.buyStatus,
-                    lastTrade.sellStatus,
-                    lastTrade.profit
-                );
-
-                logToConsole(`Sold at ${sellPrice.toFixed(2)} | Profit: ${totalProfit.toFixed(2)} USDT | New Balance: ${totalBalance.toFixed(2)} USDT`);
-                document.getElementById('tradeAction').innerText = `Trade Completed at ${new Date().toLocaleTimeString()}`;
-
-                inPosition = false;
-                buyPrice = 0;
-                sellPrice = 0;
-            }
-        } catch (err) {
-            logToConsole(`Error: ${err.message}`);
-            document.getElementById('tradeAction').innerText = `❗ Error fetching data`;
         }
-    }
 
-    setInterval(placeOrders, 3000);
+        function updateTotalBalance() {
+            document.getElementById("totalBalance").innerText = `Total Balance: ${totalBalance.toFixed(2)} USDT`;
+        }
+
+        function drawLine() {
+            logToConsole("----------------------------------------");
+        }
+
+        async function placeOrders() {
+            if (!userCapital) return;
+
+            try {
+                const ticker = await exchange.fetchTicker(symbol);
+                const midPrice = (ticker.bid + ticker.ask) / 2;
+                document.getElementById('priceInfo').innerHTML = `<strong>Current Price:</strong> ${midPrice.toFixed(2)} USDT`;
+
+                if (!inPosition && buyPrice === 0 && sellPrice === 0) {
+                    buyPrice = midPrice - 10;
+                    sellPrice = buyPrice + 32;
+                    tradeLog = {
+                        date: new Date().toLocaleString(),
+                        buyPrice: buyPrice.toFixed(2),
+                        sellPrice: sellPrice.toFixed(2),
+                        buyStatus: "Pending",
+                        sellStatus: "Pending",
+                        profit: "-",
+                        Qn: 0
+                    };
+                    updateTradeTable();
+                }
+
+                if (!inPosition && midPrice <= buyPrice) {
+                    let Q = userCapital / buyPrice;
+                    let Fb = Q * feeRate;
+                    let Qn = Q - Fb;
+                    inPosition = true;
+                    tradeLog.buyStatus = "Executed";
+                    tradeLog.Qn = Qn;
+                    updateTradeTable();
+                    drawLine();
+                    logToConsole("🔵 BUY ORDER EXECUTED");
+                    logToConsole(`Price: ${buyPrice.toFixed(2)} USDT`);
+                    logToConsole(`Quantity: ${Q.toFixed(8)} BTC`);
+                    logToConsole(`Fee: ${Fb.toFixed(8)} BTC`);
+                    logToConsole(`Net Quantity: ${Qn.toFixed(8)} BTC`);
+                    drawLine();
+                }
+
+                if (inPosition && midPrice >= sellPrice) {
+                    let S = tradeLog.Qn * sellPrice;
+                    let Fs = S * feeRate;
+                    let Cf = S - Fs;
+                    let profit = Cf - userCapital;
+                    totalBalance += profit;
+                    tradeLog.sellStatus = "Executed";
+                    tradeLog.profit = profit.toFixed(2);
+                    
+                    // Add completed trade to history
+                    tradeHistory.push({...tradeLog});
+                    
+                    updateTotalBalance();
+                    updateTradeTable();
+                    
+                    drawLine();
+                    logToConsole("🔴 SELL ORDER EXECUTED");
+                    logToConsole(`Price: ${sellPrice.toFixed(2)} USDT`);
+                    logToConsole(`Quantity: ${tradeLog.Qn.toFixed(8)} BTC`);
+                    logToConsole(`Fee: ${Fs.toFixed(2)} USDT`);
+                    logToConsole(`Profit: ${profit.toFixed(2)} USDT`);
+                    logToConsole(`New Balance: ${totalBalance.toFixed(2)} USDT`);
+                    drawLine();
+                    
+                    inPosition = false;
+                    buyPrice = 0;
+                    sellPrice = 0;
+                }
+            } catch (err) {
+                logToConsole(`Error: ${err.message}`);
+                document.getElementById('tradeAction').innerText = `❗ Error fetching data`;
+            }
+        }
+
+        function updateTradeTable() {
+            const tradeTable = document.getElementById("tradeLog");
+            let tableContent = '';
+            
+            // Add current trade if exists
+            if (tradeLog.date) {
+                tableContent += `
+                    <tr>
+                        <td>${tradeLog.date}</td>
+                        <td>${tradeLog.buyPrice}</td>
+                        <td>${tradeLog.sellPrice}</td>
+                        <td>${tradeLog.buyStatus}</td>
+                        <td>${tradeLog.sellStatus}</td>
+                        <td>${tradeLog.profit}</td>
+                    </tr>
+                `;
+            }
+            
+            // Add trade history
+            tradeHistory.forEach(trade => {
+                tableContent += `
+                    <tr class="completed-trade">
+                        <td>${trade.date}</td>
+                        <td>${trade.buyPrice}</td>
+                        <td>${trade.sellPrice}</td>
+                        <td>${trade.buyStatus}</td>
+                        <td>${trade.sellStatus}</td>
+                        <td>${trade.profit}</td>
+                    </tr>
+                `;
+            });
+            
+            tradeTable.innerHTML = tableContent;
+        }
+
+        function toggleConsole() {
+            const consoleOutput = document.getElementById("consoleOutput");
+            consoleOutput.style.display = consoleOutput.style.display === "none" ? "block" : "none";
+        }
+
+        setInterval(placeOrders, 3000);
     </script>
 </body>
 </html>
